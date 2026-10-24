@@ -46,11 +46,24 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
     setLoading(true); setError(""); setPlayerUrl("");
     async function loadPlayer() {
       try {
-        const params = new URLSearchParams({ malId: String(anime.malId ?? ""), ep: String(episodeNumber), source: "anikoto" });
-        const response = await fetch(`${API_BASE}/api/watch?${params.toString()}`, { signal: controller.signal, headers: { Accept: "application/json" } });
-        if (!response.ok) throw new Error(`The Anikoto player request failed (${response.status}).`);
-        const payload: unknown = await response.json(); const url = findPlayerUrl(payload);
-        if (!url) throw new Error("The API did not return an Anikoto player URL for this episode.");
+        if (!anime.malId) throw new Error("This anime has no MyAnimeList ID, so the player cannot resolve its episode.");
+        // AniVault exposes the stream resolver as /watch/:source/:id/:ep/:type.
+        // Use the MAL-prefixed ID because the resolver explicitly supports it.
+        const endpoint = `${API_BASE}/api/watch/anikoto/mal-${anime.malId}/${episodeNumber}/sub`;
+        const response = await fetch(endpoint, { signal: controller.signal, headers: { Accept: "application/json" } });
+        const contentType = response.headers.get("content-type") || "";
+        if (!response.ok) {
+          const detail = contentType.includes("json") ? await response.json().catch(() => null) : await response.text().catch(() => "");
+          const message = object(detail);
+          throw new Error(str(message?.error, message?.detail) || `Anikoto player request failed (${response.status}).`);
+        }
+        if (!contentType.includes("json")) throw new Error("The streaming API returned HTML instead of JSON. Check the API base URL and route.");
+        const payload: unknown = await response.json();
+        const result = object(payload);
+        // Prefer the provider's embed URL. hlsProxyUrl is a direct stream and
+        // must not be treated as an iframe URL unless no embed was supplied.
+        const url = str(result?.embedUrl, result?.playerUrl, result?.iframeUrl, result?.url) || findPlayerUrl(payload);
+        if (!url) throw new Error(str(result?.error, result?.note) || "AniVault did not return a playable Anikoto embed URL for this episode.");
         if (active) setPlayerUrl(url);
       } catch (caught) { if (active && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : "Could not load the player."); }
       finally { if (active) setLoading(false); }
