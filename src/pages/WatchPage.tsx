@@ -13,7 +13,7 @@ const object = (value: unknown): Record<string, unknown> | null => value && type
 const str = (...values: unknown[]) => values.find((value): value is string => typeof value === "string" && value.trim().length > 0) as string | undefined;
 function normalizeServers(payload: unknown): Server[] {
   const root = object(payload);
-  const rows = Array.isArray(payload) ? payload : Array.isArray(root?.servers) ? root.servers : Array.isArray(root?.data) ? root.data : Array.isArray(object(root?.data)?.servers) ? object(root?.data)?.servers as unknown[] : [];
+  const rows = Array.isArray(payload) ? payload : Array.isArray(root?.servers) ? root.servers : Array.isArray(root?.availableServers) ? root.availableServers : Array.isArray(root?.data) ? root.data : Array.isArray(object(root?.data)?.servers) ? object(root?.data)?.servers as unknown[] : Array.isArray(object(root?.data)?.availableServers) ? object(root?.data)?.availableServers as unknown[] : [];
   return rows.map((row, index) => {
     if (typeof row === "string") return { id: row, name: row };
     const item = object(row);
