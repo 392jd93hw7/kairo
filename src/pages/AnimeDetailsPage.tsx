@@ -51,6 +51,31 @@ function normalizeEpisodes(payload: unknown): Episode[] {
   }).filter((episode) => episode.number > 0);
 }
 
+
+async function fetchEpisodeThumbnail(malId: number, episode: Episode, signal: AbortSignal): Promise<string | undefined> {
+  const params = new URLSearchParams({
+    malId: String(malId),
+    episode: String(episode.number),
+  });
+  if (episode.id) params.set("episodeId", episode.id);
+  const response = await fetch(`${API_BASE}/api/kitsu/episode-thumb?${params.toString()}`, {
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) return undefined;
+  const payload: unknown = await response.json();
+  const root = asObject(payload);
+  const data = asObject(root?.data) ?? root;
+  const attributes = asObject(data?.attributes);
+  const candidates = [
+    root?.thumbnail, root?.thumbnailUrl, root?.thumbnail_url, root?.image, root?.url,
+    data?.thumbnail, data?.thumbnailUrl, data?.thumbnail_url, data?.image, data?.url,
+    attributes?.thumbnail, attributes?.thumbnailUrl, attributes?.thumbnail_url,
+    attributes?.image, attributes?.url,
+  ];
+  return candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
+}
+
 export default function AnimeDetailsPage({ anime, onBack, onWatch }: {
   anime: AnimeSearchResult;
   onBack: () => void;
@@ -103,7 +128,20 @@ export default function AnimeDetailsPage({ anime, onBack, onWatch }: {
         });
         if (!response.ok) throw new Error(`Episode request failed (${response.status})`);
         const payload: unknown = await response.json();
-        if (active) setEpisodes(normalizeEpisodes(payload));
+        const normalized = normalizeEpisodes(payload);
+        if (active) setEpisodes(normalized);
+
+        // Fetch episode-specific thumbnails from the Kitsu thumbnail endpoint.
+        const withThumbnails = await Promise.all(normalized.map(async (episode) => {
+          if (episode.thumbnail) return episode;
+          try {
+            const thumbnail = await fetchEpisodeThumbnail(anime.malId!, episode, controller.signal);
+            return thumbnail ? { ...episode, thumbnail } : episode;
+          } catch {
+            return episode;
+          }
+        }));
+        if (active) setEpisodes(withThumbnails);
       } catch {
         if (active && !controller.signal.aborted) setEpisodes([]);
       } finally {
