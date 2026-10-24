@@ -44,7 +44,7 @@ function normalizeEpisodes(payload: unknown): Episode[] {
     return {
       number: number(item?.number) ?? number(item?.episode) ?? number(item?.episodeNumber) ?? index + 1,
       title: text(item?.title) ?? text(item?.name),
-      id: text(item?.id) ?? text(item?.episodeId),
+      id: text(item?.id) ?? text(item?.episodeId) ?? text(item?.episode_id) ?? text(item?._id) ?? text(item?.slug),
       filler: item?.filler === true,
       thumbnail: text(item?.thumbnail) ?? text(item?.thumbnailUrl) ?? text(item?.thumbnail_url) ?? text(item?.image) ?? text(item?.imageUrl) ?? text(item?.image_url) ?? text(item?.poster) ?? text(asObject(item?.images)?.jpg && asObject(asObject(item?.images)?.jpg)?.image_url),
     };
@@ -53,26 +53,46 @@ function normalizeEpisodes(payload: unknown): Episode[] {
 
 
 async function fetchEpisodeThumbnail(malId: number, episode: Episode, signal: AbortSignal): Promise<string | undefined> {
-  const params = new URLSearchParams({
-    ep: episode.id ?? String(episode.number),
-    malId: String(malId),
-  });
+  // The endpoint expects the episode identifier in "ep" and the MAL anime ID in "malId".
+  const epId = episode.id ?? String(episode.number);
+  const params = new URLSearchParams({ ep: epId, malId: String(malId) });
   const response = await fetch(`${API_BASE}/api/kitsu/episode-thumb?${params.toString()}`, {
     signal,
     headers: { Accept: "application/json" },
   });
   if (!response.ok) return undefined;
+
   const payload: unknown = await response.json();
-  const root = asObject(payload);
-  const data = asObject(root?.data) ?? root;
-  const attributes = asObject(data?.attributes);
-  const candidates = [
-    root?.thumbnail, root?.thumbnailUrl, root?.thumbnail_url, root?.image, root?.url,
-    data?.thumbnail, data?.thumbnailUrl, data?.thumbnail_url, data?.image, data?.url,
-    attributes?.thumbnail, attributes?.thumbnailUrl, attributes?.thumbnail_url,
-    attributes?.image, attributes?.url,
-  ];
-  return candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
+  // API deployments may wrap the URL in different response shapes.
+  const findImage = (value: unknown, depth = 0): string | undefined => {
+    if (depth > 5 || value == null) return undefined;
+    if (typeof value === "string" && /^(https?:)?\/\//i.test(value.trim())) return value.trim();
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = findImage(item, depth + 1);
+        if (found) return found;
+      }
+      return undefined;
+    }
+    const object = asObject(value);
+    if (!object) return undefined;
+    const preferredKeys = [
+      "thumbnail", "thumbnailUrl", "thumbnail_url", "thumbnailImage",
+      "image", "imageUrl", "image_url", "poster", "posterUrl", "poster_url",
+      "original", "large", "medium", "small", "url", "src", "href",
+    ];
+    for (const key of preferredKeys) {
+      const found = findImage(object[key], depth + 1);
+      if (found) return found;
+    }
+    for (const key of ["data", "attributes", "images", "relationships", "episode", "result"]) {
+      const found = findImage(object[key], depth + 1);
+      if (found) return found;
+    }
+    return undefined;
+  };
+
+  return findImage(payload);
 }
 
 export default function AnimeDetailsPage({ anime, onBack, onWatch }: {
@@ -132,8 +152,8 @@ export default function AnimeDetailsPage({ anime, onBack, onWatch }: {
 
         // Fetch episode-specific thumbnails from the Kitsu thumbnail endpoint.
         const withThumbnails = await Promise.all(normalized.map(async (episode) => {
-          if (episode.thumbnail) return episode;
           try {
+            // Prefer the dedicated Kitsu endpoint; use the episode API thumbnail only as fallback.
             const thumbnail = await fetchEpisodeThumbnail(anime.malId!, episode, controller.signal);
             return thumbnail ? { ...episode, thumbnail } : episode;
           } catch {
