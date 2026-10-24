@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ArrowUpRight, LoaderCircle, Search, X } from "lucide-react";
 import { useAnimeSearch } from "../../hooks/useAnimeSearch";
 import { getKitsuArtwork, type AnimeSearchResult } from "../../services/api/search.api";
@@ -15,8 +15,6 @@ export default function NavbarSearch({ onSelectAnime }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { results, loading, error } = useAnimeSearch(query, open);
   const hasQuery = query.trim().length >= 2;
-
-  const rows = useMemo(() => results, [results]);
 
   useEffect(() => {
     setActiveIndex(-1);
@@ -47,17 +45,17 @@ export default function NavbarSearch({ onSelectAnime }: Props) {
     onSelectAnime(anime);
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setOpen(true);
-      setActiveIndex((current) => Math.min(current + 1, rows.length - 1));
+      setActiveIndex((current) => Math.min(current + 1, results.length - 1));
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       setActiveIndex((current) => Math.max(current - 1, 0));
-    } else if (event.key === "Enter" && activeIndex >= 0 && rows[activeIndex]) {
+    } else if (event.key === "Enter" && activeIndex >= 0 && results[activeIndex]) {
       event.preventDefault();
-      select(rows[activeIndex]);
+      select(results[activeIndex]);
     } else if (event.key === "Escape") {
       setOpen(false);
       inputRef.current?.blur();
@@ -103,13 +101,13 @@ export default function NavbarSearch({ onSelectAnime }: Props) {
             <span className="search-popover__hint">ANIME</span>
           </div>
 
-          {loading && rows.length === 0 && (
+          {loading && results.length === 0 && (
             <div className="search-state"><LoaderCircle className="spin" size={20} /> Finding your next obsession</div>
           )}
           {!loading && error && <div className="search-state search-state--error">{error}. Please try again.</div>}
-          {!loading && !error && rows.length === 0 && <div className="search-state">No anime found. Try another title.</div>}
+          {!loading && !error && results.length === 0 && <div className="search-state">No anime found. Try another title.</div>}
 
-          {rows.map((anime, index) => (
+          {results.map((anime, index) => (
             <SearchResultRow
               key={anime.id}
               anime={anime}
@@ -118,7 +116,7 @@ export default function NavbarSearch({ onSelectAnime }: Props) {
             />
           ))}
 
-          {rows.length > 0 && (
+          {results.length > 0 && (
             <div className="search-popover__footer">
               <span><kbd>↑</kbd> <kbd>↓</kbd> to navigate</span>
               <span><kbd>Enter</kbd> to open</span>
@@ -150,7 +148,6 @@ function SearchResultRow({ anime, active, onChoose }: { anime: AnimeSearchResult
       aria-selected={active}
       className={`search-result ${active ? "search-result--active" : ""}`}
       onClick={onChoose}
-      onMouseEnter={(event) => event.currentTarget.classList.add("search-result--hover")}
     >
       <span className="search-result__poster">
         {artwork ? <img src={artwork} alt="" loading="lazy" /> : <span className="poster-placeholder">K</span>}
