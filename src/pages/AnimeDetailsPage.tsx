@@ -54,8 +54,9 @@ function normalizeEpisodes(payload: unknown): Episode[] {
 
 async function fetchEpisodeThumbnail(malId: number, episode: Episode, signal: AbortSignal): Promise<string | undefined> {
   // The endpoint expects the episode identifier in "ep" and the MAL anime ID in "malId".
-  const epId = episode.id ?? String(episode.number);
-  const params = new URLSearchParams({ ep: epId, malId: String(malId) });
+  // The endpoint resolves the episode number (for example ep=1) against the MAL anime ID.
+  // AniKoto episode IDs are not Kitsu episode IDs, so do not pass episode.id here.
+  const params = new URLSearchParams({ ep: String(episode.number), malId: String(malId) });
   const response = await fetch(`${API_BASE}/api/kitsu/episode-thumb?${params.toString()}`, {
     signal,
     headers: { Accept: "application/json" },
