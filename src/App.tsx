@@ -86,7 +86,7 @@ export default function App() {
           <span className="brand-word">kairo<span>.</span></span>
         </a>
         <nav className="main-nav" aria-label="Main navigation">
-          <a className={`main-nav__link ${!showingDetails ? "main-nav__link--active" : ""}`} href="/" onClick={(event) => { event.preventDefault(); goHome(); }}>Discover</a>
+          <a className={`main-nav__link ${!showingDetails && !showingWatch ? "main-nav__link--active" : ""}`} href="/" onClick={(event) => { event.preventDefault(); goHome(); }}>Discover</a>
           <a className="main-nav__link" href="/#explore" onClick={(event) => { event.preventDefault(); goHome(); window.setTimeout(() => document.getElementById("explore")?.scrollIntoView({ behavior: "smooth" }), 0); }}>Explore</a>
           <a className="main-nav__link" href="/#schedule" onClick={(event) => { event.preventDefault(); setNotice("The release schedule is planned for a later build step."); }}>Schedule</a>
         </nav>
@@ -96,7 +96,9 @@ export default function App() {
         </div>
       </header>
 
-      {showingDetails && selectedAnime ? (
+      {showingWatch && selectedAnime ? (
+        <WatchPage anime={selectedAnime} episodeNumber={selectedEpisode} onBack={backToDetails} onChangeEpisode={changeEpisode} />
+      ) : showingDetails && selectedAnime ? (
         <AnimeDetailsPage anime={selectedAnime} onBack={goHome} onWatch={startEpisode} />
       ) : (
         <main>
