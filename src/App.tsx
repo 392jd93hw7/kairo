@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowDown, ArrowRight, Compass, Play, Sparkles } from "lucide-react";
 import NavbarSearch from "./components/layout/NavbarSearch";
 import AnimeDetailsPage from "./pages/AnimeDetailsPage";
+import WatchPage from "./pages/WatchPage";
 import type { AnimeSearchResult } from "./services/api/search.api";
 
 const featured = [
@@ -14,11 +15,16 @@ export default function App() {
   const [selectedAnime, setSelectedAnime] = useState<AnimeSearchResult | null>(null);
   const [route, setRoute] = useState(window.location.pathname);
   const [notice, setNotice] = useState("");
+  const [selectedEpisode, setSelectedEpisode] = useState(1);
 
   useEffect(() => {
     const onPopState = () => {
       setRoute(window.location.pathname);
+      const stateAnime = window.history.state?.anime as AnimeSearchResult | undefined;
+      if (stateAnime) setSelectedAnime(stateAnime);
       if (window.location.pathname === "/") setSelectedAnime(null);
+      const episode = Number(new URLSearchParams(window.location.search).get("ep"));
+      if (Number.isFinite(episode) && episode > 0) setSelectedEpisode(episode);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -42,10 +48,32 @@ export default function App() {
   };
 
   const startEpisode = (anime: AnimeSearchResult, episode: { number: number }) => {
-    setNotice(`Selected ${anime.title} — Episode ${episode.number}. The dedicated Anikoto watch page is the next build step.`);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    setSelectedAnime(anime);
+    setSelectedEpisode(episode.number);
+    const path = `/watch/${encodeURIComponent(anime.id)}?ep=${episode.number}`;
+    window.history.pushState({ anime }, "", path);
+    setRoute(path);
+    setNotice("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const changeEpisode = (episodeNumber: number) => {
+    setSelectedEpisode(episodeNumber);
+    const path = `/watch/${encodeURIComponent(selectedAnime?.id ?? "")}?ep=${episodeNumber}`;
+    window.history.pushState({ anime: selectedAnime }, "", path);
+    setRoute(path);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const backToDetails = () => {
+    if (!selectedAnime) return goHome();
+    const path = `/anime/${encodeURIComponent(selectedAnime.id)}`;
+    window.history.pushState({ anime: selectedAnime }, "", path);
+    setRoute(path);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const showingWatch = route.startsWith("/watch/") && selectedAnime !== null;
   const showingDetails = route.startsWith("/anime/") && selectedAnime !== null;
 
   return (
