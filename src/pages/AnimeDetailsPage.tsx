@@ -5,7 +5,8 @@ import { getKitsuArtwork } from "../services/api/search.api";
 
 const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "https://anivault-scraper-khaki.vercel.app").replace(/\/$/, "");
 
-type Episode = { number: number; title?: string; id?: string; filler?: boolean; thumbnail?: string };\nconst thumbnailCache = new Map<string, string>();
+type Episode = { number: number; title?: string; id?: string; filler?: boolean; thumbnail?: string };
+const thumbnailCache = new Map<string, string>();
 type Details = {
   title?: string;
   titleEnglish?: string;
