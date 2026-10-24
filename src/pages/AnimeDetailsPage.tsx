@@ -133,7 +133,16 @@ export default function AnimeDetailsPage({ anime, onBack, onWatch }: {
     <main className="details-page">
       <button className="back-button" type="button" onClick={onBack}><ArrowLeft size={16} /> Back to discover</button>
       <section className="details-hero">
-        <div className="details-backdrop" style={artwork ? { backgroundImage: `linear-gradient(90deg,#090a12 0%,rgba(9,10,18,.94) 36%,rgba(9,10,18,.48) 100%),linear-gradient(0deg,#090a12 0%,transparent 70%),url("${artwork}")` : undefined} />
+        <div
+          className="details-backdrop"
+          style={
+            artwork
+              ? {
+                  backgroundImage: `linear-gradient(90deg,#090a12 0%,rgba(9,10,18,.94) 36%,rgba(9,10,18,.48) 100%),linear-gradient(0deg,#090a12 0%,transparent 70%),url("${artwork}")`,
+                }
+              : undefined
+          }
+        />
         <div className="details-poster">{artwork ? <img src={artwork} alt={`${title} poster`} /> : <div className="details-poster__placeholder">K</div>}</div>
         <div className="details-copy">
           <span className="section-kicker">ANIME DETAILS / KAIRO</span>
