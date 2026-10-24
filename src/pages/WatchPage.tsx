@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Hls from "hls.js";
 import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Play, RefreshCw, ShieldAlert, Search, Captions, Mic, Grid2X2, Eye, Flag, Settings, Volume2, Maximize } from "lucide-react";
 import type { AnimeSearchResult } from "../services/api/search.api";
 
 const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "https://anivault-scraper-khaki.vercel.app").replace(/\/$/, "");
 type Episode = { number: number; title?: string; id?: string; thumbnail?: string };
 type Server = { id: string; name: string; type?: string; available?: boolean };
+type Subtitle = { url: string; lang: string; default?: boolean };
+type WatchResponse = { embedUrl?: string; m3u8?: string; hlsProxyUrl?: string; iframeOnly?: boolean; subtitles?: Subtitle[]; note?: string | null; error?: string };
 type Props = { anime: AnimeSearchResult; episodeNumber: number; onBack: () => void; onChangeEpisode: (episodeNumber: number) => void };
 const object = (value: unknown): Record<string, unknown> | null => value && typeof value === "object" ? value as Record<string, unknown> : null;
 const str = (...values: unknown[]) => values.find((value): value is string => typeof value === "string" && value.trim().length > 0) as string | undefined;
@@ -35,6 +38,10 @@ function findPlayerUrl(payload: unknown, depth = 0): string | undefined {
 export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisode }: Props) {
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [playerUrl, setPlayerUrl] = useState("");
+  const [streamUrl, setStreamUrl] = useState("");
+  const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
+  const [selectedSubtitle, setSelectedSubtitle] = useState("");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [servers, setServers] = useState<Server[]>([]);
   const [selectedServer, setSelectedServer] = useState("");
   const [audioType, setAudioType] = useState<"sub" | "dub">("sub");
@@ -79,20 +86,13 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
   useEffect(() => {
     if (serversLoading) return;
     const controller = new AbortController(); let active = true;
-    setLoading(true); setError(""); setPlayerUrl("");
+    setLoading(true); setError(""); setPlayerUrl(""); setStreamUrl(""); setSubtitles([]); setSelectedSubtitle("");
     async function loadPlayer() {
       try {
         if (!anime.malId) throw new Error("This anime has no MyAnimeList ID, so the player cannot resolve its episode.");
-        const params = new URLSearchParams({
-          malId: String(anime.malId),
-          ep: String(episodeNumber),
-          type: audioType,
-          source: "anikoto",
-        });
+        const params = new URLSearchParams({ malId: String(anime.malId), ep: String(episodeNumber), type: audioType, source: "anikoto" });
         if (selectedServer) params.set("server", selectedServer);
-        const response = await fetch(`${API_BASE}/api/watch?${params.toString()}`, {
-          signal: controller.signal, headers: { Accept: "application/json" },
-        });
+        const response = await fetch(`${API_BASE}/api/watch?${params.toString()}`, { signal: controller.signal, headers: { Accept: "application/json" } });
         const contentType = response.headers.get("content-type") || "";
         if (!response.ok) {
           const detail = contentType.includes("json") ? await response.json().catch(() => null) : await response.text().catch(() => "");
@@ -100,11 +100,19 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
           throw new Error(str(message?.error, message?.message, message?.detail) || `Anikoto player request failed (${response.status}).`);
         }
         if (!contentType.includes("json")) throw new Error("The streaming endpoint returned HTML instead of JSON. Check the API base URL and route.");
-        const payload: unknown = await response.json();
-        const result = object(payload);
-        const url = str(result?.embedUrl, result?.embed_url, result?.iframeUrl, result?.iframe, result?.playerUrl, result?.player_url, result?.url, result?.src, result?.streamUrl, result?.stream_url) || findPlayerUrl(payload);
-        if (!url) throw new Error(str(result?.error, result?.message, result?.note) || "No player URL was returned for this server and episode.");
-        if (active) setPlayerUrl(url);
+        const payload = await response.json() as WatchResponse;
+        const stream = str(payload.hlsProxyUrl, payload.m3u8);
+        const embed = str(payload.embedUrl);
+        const tracks = Array.isArray(payload.subtitles) ? payload.subtitles.filter((track): track is Subtitle => !!track && typeof track.url === "string" && typeof track.lang === "string") : [];
+        if (!stream && !embed) throw new Error(payload.error || payload.note || "The API did not return an HLS stream or embed URL.");
+        if (active) {
+          setSubtitles(tracks);
+          const defaultTrack = tracks.find(track => track.default) || tracks.find(track => /english/i.test(track.lang));
+          setSelectedSubtitle(defaultTrack?.url || "");
+          if (stream && !payload.iframeOnly) setStreamUrl(stream);
+          else if (embed) setPlayerUrl(embed);
+          else throw new Error("The API returned an embed-only player without an embed URL.");
+        }
       } catch (caught) {
         if (active && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : "Could not load the player.");
       } finally { if (active) setLoading(false); }
@@ -112,6 +120,22 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
     void loadPlayer();
     return () => { active = false; controller.abort(); };
   }, [anime.malId, episodeNumber, audioType, selectedServer, serversLoading]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !streamUrl) return;
+    let hls: Hls | null = null;
+    if (video.canPlayType("application/vnd.apple.mpegurl")) video.src = streamUrl;
+    else if (Hls.isSupported()) {
+      hls = new Hls({ enableWorker: true, capLevelToPlayerSize: true });
+      hls.loadSource(streamUrl); hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) setError(data.type === Hls.ErrorTypes.NETWORK_ERROR ? "The stream network request failed. Try another available server." : "This stream could not be decoded. Try another server.");
+      });
+    } else setError("HLS playback is not supported by this browser.");
+    return () => { hls?.destroy(); video.removeAttribute("src"); video.load(); };
+  }, [streamUrl]);
+
 
   const previous = episodes.filter(item => item.number < episodeNumber).at(-1);
   const next = episodes.find(item => item.number > episodeNumber);
@@ -122,6 +146,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
       <div className="watch-main-column">
         <section className="watch-player-shell" aria-label="Anime video player">
           {loading ? <div className="watch-player-state"><RefreshCw className="spin" size={26}/><strong>Connecting to Anikoto…</strong><span>Preparing episode {episodeNumber}</span></div>
+          : streamUrl ? <div className="kairo-video-wrap"><video ref={videoRef} className="kairo-video" controls playsInline preload="metadata" autoPlay aria-label={`${anime.title} episode ${episodeNumber}`}>{subtitles.map(track => <track key={track.url} src={track.url} kind="subtitles" srcLang={track.lang.slice(0,2).toLowerCase()} label={track.lang} default={track.url === selectedSubtitle}/>)}</video><div className="kairo-player-top"><span><i/> KAIRO PLAYER</span><a href={streamUrl} target="_blank" rel="noreferrer"><ExternalLink size={13}/> Stream URL</a></div>{subtitles.length > 0 && <label className="kairo-subtitle-picker"><Captions size={14}/><select aria-label="Subtitle language" value={selectedSubtitle} onChange={event => {setSelectedSubtitle(event.target.value); const video=videoRef.current; if(video) Array.from(video.textTracks).forEach((track,index)=>{track.mode = subtitles[index]?.url === event.target.value ? "showing" : "disabled";});}}><option value="">Subtitles off</option>{subtitles.map(track=><option key={track.url} value={track.url}>{track.lang}{track.default ? " (default)" : ""}</option>)}</select></label>}{error && <div className="kairo-video-warning">{error}</div>}</div>
           : playerUrl ? <><iframe key={playerUrl} className="watch-iframe" src={playerUrl} title={`${anime.title} — Episode ${episodeNumber}`} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" /><a className="watch-open-link" href={playerUrl} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Open player</a></>
           : <div className="watch-player-state watch-player-state--error"><ShieldAlert size={30}/><strong>Player unavailable</strong><span>{error || "This episode does not currently have a playable URL."}</span><button className="button button--quiet" type="button" onClick={() => onChangeEpisode(episodeNumber)}><RefreshCw size={14}/> Try again</button><small>Kairo uses Anikoto only. It will not silently switch to another provider.</small></div>}
         </section>
