@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Maximize, Play, RefreshCw, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Play, RefreshCw, ShieldAlert } from "lucide-react";
 import type { AnimeSearchResult } from "../services/api/search.api";
 
 const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "https://anivault-scraper-khaki.vercel.app").replace(/\/$/, "");
 type Episode = { number: number; title?: string; id?: string };
 type Props = { anime: AnimeSearchResult; episodeNumber: number; onBack: () => void; onChangeEpisode: (episodeNumber: number) => void };
 const object = (value: unknown): Record<string, unknown> | null => value && typeof value === "object" ? value as Record<string, unknown> : null;
-const str = (...values: unknown[]) => values.find((value): value is string => typeof value === "string" && value.trim()) as string | undefined;
+const str = (...values: unknown[]) => values.find((value): value is string => typeof value === "string" && value.trim().length > 0) as string | undefined;
 function normalizeEpisodes(payload: unknown): Episode[] {
   const root = object(payload);
   const rows = Array.isArray(payload) ? payload : Array.isArray(root?.episodes) ? root.episodes : Array.isArray(root?.data) ? root.data : Array.isArray(object(root?.data)?.episodes) ? object(root?.data)?.episodes as unknown[] : [];
