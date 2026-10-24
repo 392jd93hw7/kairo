@@ -7,7 +7,7 @@ const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "https://anivault-sc
 type Episode = { number: number; title?: string; id?: string; thumbnail?: string };
 type Server = { id: string; name: string; type?: string; available?: boolean };
 type Subtitle = { url: string; lang: string; default?: boolean };
-type WatchResponse = { embedUrl?: string; m3u8?: string; iframeOnly?: boolean; subtitles?: Subtitle[]; note?: string | null; error?: string };
+type WatchResponse = { embedUrl?: string; m3u8?: string; hlsProxyUrl?: string; iframeOnly?: boolean; subtitles?: Subtitle[]; note?: string | null; error?: string };
 type Props = { anime: AnimeSearchResult; episodeNumber: number; onBack: () => void; onChangeEpisode: (episodeNumber: number) => void };
 const object = (value: unknown): Record<string, unknown> | null => value && typeof value === "object" ? value as Record<string, unknown> : null;
 const str = (...values: unknown[]) => values.find((value): value is string => typeof value === "string" && value.trim().length > 0) as string | undefined;
@@ -93,10 +93,13 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
         }
         if (!contentType.includes("json")) throw new Error("The streaming endpoint returned HTML instead of JSON. Check the API base URL and route.");
         const payload = await response.json() as WatchResponse;
-        console.info("[Kairo debug] /api/watch response", { request: `${API_BASE}/api/watch?${params.toString()}`, malId: anime.malId, episodeNumber, audioType, selectedServer, m3u8: payload.m3u8, embedUrl: payload.embedUrl });
-        // Use the complete M3U8 URL exactly as returned by /api/watch, including its signed token query parameter.
-        // Do not rebuild the URL from its path or substitute hlsProxyUrl.
-        const stream = typeof payload.m3u8 === "string" && payload.m3u8.trim() ? payload.m3u8 : undefined;
+        console.info("[Kairo debug] /api/watch response", { request: `${API_BASE}/api/watch?${params.toString()}`, malId: anime.malId, episodeNumber, audioType, selectedServer, m3u8: payload.m3u8, hlsProxyUrl: payload.hlsProxyUrl, embedUrl: payload.embedUrl });
+        // Prefer the API-provided HLS proxy when available. The captured browser HAR showed
+        // the direct m3u8 host returning HTTP 403, while /api/watch also supplies hlsProxyUrl.
+        // Never reconstruct signed stream URLs manually; use the exact URL provided by the API.
+        const directStream = typeof payload.m3u8 === "string" && payload.m3u8.trim() ? payload.m3u8 : undefined;
+        const proxyStream = typeof payload.hlsProxyUrl === "string" && payload.hlsProxyUrl.trim() ? payload.hlsProxyUrl : undefined;
+        const stream = proxyStream || directStream;
         const embed = str(payload.embedUrl);
         const tracks = Array.isArray(payload.subtitles) ? payload.subtitles.filter((track): track is Subtitle => !!track && typeof track.url === "string" && typeof track.lang === "string") : [];
         if (!stream && !embed) throw new Error(payload.error || payload.note || "The API did not return an M3U8 stream or embed URL.");
