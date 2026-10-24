@@ -221,3 +221,55 @@ button{color:inherit}a{color:inherit}img{display:block;max-width:100%}
 .kairo-video-wrap:hover .kairo-subtitle-picker,.kairo-video-wrap:focus-within .kairo-subtitle-picker{opacity:1}
 .kairo-subtitle-picker select{max-width:170px;border:0;outline:0;background:#111;color:#fff;font-size:11px}
 .kairo-video-warning{position:absolute;left:12px;right:12px;bottom:12px;padding:9px 12px;background:rgba(80,20,20,.92);color:#ffd7d7;border-radius:5px;font-size:12px}
+
+
+/* Kairo custom Plyr skin */
+.kairo-video-wrap .plyr {
+  --plyr-color-main: #a6df00;
+  --plyr-video-control-color: #f7f7f7;
+  --plyr-video-control-color-hover: #a6df00;
+  --plyr-video-control-background-hover: rgba(166,223,0,.12);
+  --plyr-menu-background: #11120e;
+  --plyr-menu-color: #f7f7f7;
+  --plyr-menu-border-color: rgba(255,255,255,.1);
+  --plyr-tooltip-background: #a6df00;
+  --plyr-tooltip-color: #10120a;
+  --plyr-range-fill-background: #a6df00;
+  --plyr-video-background: #050505;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+}
+.kairo-video-wrap .plyr__controls {
+  padding: 12px 14px;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,.88));
+}
+.kairo-video-wrap .plyr__control--overlaid {
+  background: #a6df00;
+  color: #111;
+  box-shadow: 0 0 0 8px rgba(166,223,0,.16);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.kairo-video-wrap .plyr__control--overlaid:hover {
+  background: #c4ff32;
+  transform: scale(1.06);
+  box-shadow: 0 0 0 12px rgba(166,223,0,.2);
+}
+.kairo-video-wrap .plyr__menu__container .plyr__control[ role="menuitemradio"][aria-checked="true"]::before {
+  background: #a6df00;
+}
+.kairo-video-wrap .plyr__progress__buffer {
+  color: rgba(255,255,255,.28);
+}
+.kairo-video-wrap .plyr--full-ui input[type=range] {
+  color: #a6df00;
+}
+.kairo-video-wrap .plyr__video-wrapper {
+  background: #050505;
+}
+@media (max-width: 600px) {
+  .kairo-video-wrap .plyr__controls { padding: 8px 7px; gap: 2px; }
+  .kairo-video-wrap .plyr__control { padding: 5px; }
+  .kairo-video-wrap .plyr__time { font-size: 11px; }
+}
