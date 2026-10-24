@@ -7,6 +7,7 @@ const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "https://anivault-sc
 
 type Episode = { number: number; title?: string; id?: string; filler?: boolean; thumbnail?: string };
 const thumbnailCache = new Map<string, string>();
+const episodeListCache = new Map<number, Episode[]>();
 type Details = {
   title?: string;
   titleEnglish?: string;
@@ -143,43 +144,59 @@ export default function AnimeDetailsPage({ anime, onBack, onWatch }: {
         setLoadingEpisodes(false);
         return;
       }
+
+      // Show previously fetched episode lists immediately while revalidating in the background.
+      const cachedEpisodes = episodeListCache.get(anime.malId);
+      if (cachedEpisodes?.length && active) {
+        setEpisodes(cachedEpisodes.map((episode) => ({
+          ...episode,
+          thumbnail: episode.thumbnail ?? thumbnailCache.get(`${anime.malId}:${episode.number}`),
+        })));
+        setLoadingEpisodes(false);
+      }
+
       try {
         const response = await fetch(`${API_BASE}/api/episodes?malId=${anime.malId}&source=anikoto`, {
-          signal: controller.signal, headers: { Accept: "application/json" },
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
         });
         if (!response.ok) throw new Error(`Episode request failed (${response.status})`);
         const payload: unknown = await response.json();
         const normalized = normalizeEpisodes(payload);
-        if (active) setEpisodes(normalized);
-
-        // Load thumbnails concurrently and update each card as soon as its URL is resolved.
-        // Cached URLs are applied immediately on repeat visits.
         const cacheKey = String(anime.malId);
-        const withCached = normalized.map((episode) => ({
+        const initial = normalized.map((episode) => ({
           ...episode,
           thumbnail: episode.thumbnail ?? thumbnailCache.get(`${cacheKey}:${episode.number}`),
         }));
-        if (active) setEpisodes(withCached);
-        await Promise.all(normalized.map(async (episode) => {
+        episodeListCache.set(anime.malId, initial);
+        if (active) {
+          setEpisodes(initial);
+          setLoadingEpisodes(false);
+        }
+
+        // Thumbnails never block the episode list; update cards individually as URLs arrive.
+        void Promise.all(normalized.map(async (episode) => {
           const key = `${cacheKey}:${episode.number}`;
-          const cached = thumbnailCache.get(key);
-          if (cached) return;
+          if (thumbnailCache.has(key)) return;
           try {
             const thumbnail = await fetchEpisodeThumbnail(anime.malId!, episode, controller.signal);
             if (thumbnail) {
               thumbnailCache.set(key, thumbnail);
+              episodeListCache.set(anime.malId!, (episodeListCache.get(anime.malId!) ?? []).map((item) =>
+                item.number === episode.number ? { ...item, thumbnail } : item
+              ));
               if (active) setEpisodes((current) => current.map((item) =>
                 item.number === episode.number ? { ...item, thumbnail } : item
               ));
             }
           } catch {
-            // Keep the already-rendered anime artwork while this thumbnail is unavailable.
+            // Keep the poster placeholder while the thumbnail is unavailable.
           }
         }));
       } catch {
-        if (active && !controller.signal.aborted) setEpisodes([]);
+        if (active && !controller.signal.aborted && !episodeListCache.has(anime.malId)) setEpisodes([]);
       } finally {
-        if (active) setLoadingEpisodes(false);
+        if (active && !episodeListCache.has(anime.malId)) setLoadingEpisodes(false);
       }
     }
 
