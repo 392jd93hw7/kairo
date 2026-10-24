@@ -77,6 +77,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
   }, [anime.malId, episodeNumber]);
 
   useEffect(() => {
+    if (serversLoading) return;
     const controller = new AbortController(); let active = true;
     setLoading(true); setError(""); setPlayerUrl("");
     async function loadPlayer() {
@@ -110,7 +111,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
     }
     void loadPlayer();
     return () => { active = false; controller.abort(); };
-  }, [anime.malId, episodeNumber, audioType, selectedServer]);
+  }, [anime.malId, episodeNumber, audioType, selectedServer, serversLoading]);
 
   const previous = episodes.filter(item => item.number < episodeNumber).at(-1);
   const next = episodes.find(item => item.number > episodeNumber);
