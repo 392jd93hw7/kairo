@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowDown, ArrowRight, Compass, Play, Sparkles } from "lucide-react";
 import NavbarSearch from "./components/layout/NavbarSearch";
-import AnimeDetailsPage from "./pages/AnimeDetailsPage";
-import WatchPage from "./pages/WatchPage";
+const AnimeDetailsPage = lazy(() => import("./pages/AnimeDetailsPage"));
+const WatchPage = lazy(() => import("./pages/WatchPage"));
 import type { AnimeSearchResult } from "./services/api/search.api";
 
 const featured = [
@@ -97,9 +97,13 @@ export default function App() {
       </header>
 
       {showingWatch && selectedAnime ? (
-        <WatchPage anime={selectedAnime} episodeNumber={selectedEpisode} onBack={backToDetails} onChangeEpisode={changeEpisode} />
+        <Suspense fallback={<div className="page-loading" role="status">Loading player…</div>}>
+          <WatchPage anime={selectedAnime} episodeNumber={selectedEpisode} onBack={backToDetails} onChangeEpisode={changeEpisode} />
+        </Suspense>
       ) : showingDetails && selectedAnime ? (
-        <AnimeDetailsPage anime={selectedAnime} onBack={goHome} onWatch={startEpisode} />
+        <Suspense fallback={<div className="page-loading" role="status">Loading anime details…</div>}>
+          <AnimeDetailsPage anime={selectedAnime} onBack={goHome} onWatch={startEpisode} />
+        </Suspense>
       ) : (
         <main>
           <section className="hero">
