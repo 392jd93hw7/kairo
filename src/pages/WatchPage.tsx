@@ -93,6 +93,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
         }
         if (!contentType.includes("json")) throw new Error("The streaming endpoint returned HTML instead of JSON. Check the API base URL and route.");
         const payload = await response.json() as WatchResponse;
+        console.info("[Kairo debug] /api/watch response", { request: `${API_BASE}/api/watch?${params.toString()}`, malId: anime.malId, episodeNumber, audioType, selectedServer, m3u8: payload.m3u8, embedUrl: payload.embedUrl });
         // Use the complete M3U8 URL exactly as returned by /api/watch, including its signed token query parameter.
         // Do not rebuild the URL from its path or substitute hlsProxyUrl.
         const stream = typeof payload.m3u8 === "string" && payload.m3u8.trim() ? payload.m3u8 : undefined;
@@ -124,6 +125,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
     if (video.canPlayType("application/vnd.apple.mpegurl")) video.src = streamUrl;
     else if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, capLevelToPlayerSize: true });
+      console.info("[Kairo debug] HLS player loading", { streamUrl, videoCurrentSrc: video.currentSrc, videoSrc: video.src });
       hls.loadSource(streamUrl); hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) setError(data.type === Hls.ErrorTypes.NETWORK_ERROR ? "The direct stream request failed. Check stream availability and CORS, or try another available server." : "This stream could not be decoded. Try another server.");
