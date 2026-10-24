@@ -7,7 +7,7 @@ const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "https://anivault-sc
 type Episode = { number: number; title?: string; id?: string; thumbnail?: string };
 type Server = { id: string; name: string; type?: string; available?: boolean };
 type Subtitle = { url: string; lang: string; default?: boolean };
-type WatchResponse = { embedUrl?: string; m3u8?: string; hlsProxyUrl?: string; iframeOnly?: boolean; subtitles?: Subtitle[]; note?: string | null; error?: string };
+type WatchResponse = { embedUrl?: string; m3u8?: string; iframeOnly?: boolean; subtitles?: Subtitle[]; note?: string | null; error?: string };
 type Props = { anime: AnimeSearchResult; episodeNumber: number; onBack: () => void; onChangeEpisode: (episodeNumber: number) => void };
 const object = (value: unknown): Record<string, unknown> | null => value && typeof value === "object" ? value as Record<string, unknown> : null;
 const str = (...values: unknown[]) => values.find((value): value is string => typeof value === "string" && value.trim().length > 0) as string | undefined;
@@ -92,10 +92,11 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
         }
         if (!contentType.includes("json")) throw new Error("The streaming endpoint returned HTML instead of JSON. Check the API base URL and route.");
         const payload = await response.json() as WatchResponse;
-        const stream = str(payload.hlsProxyUrl, payload.m3u8);
+        // Prefer the original M3U8 manifest. Do not use hlsProxyUrl or route stream traffic through a proxy.
+        const stream = str(payload.m3u8);
         const embed = str(payload.embedUrl);
         const tracks = Array.isArray(payload.subtitles) ? payload.subtitles.filter((track): track is Subtitle => !!track && typeof track.url === "string" && typeof track.lang === "string") : [];
-        if (!stream && !embed) throw new Error(payload.error || payload.note || "The API did not return an HLS stream or embed URL.");
+        if (!stream && !embed) throw new Error(payload.error || payload.note || "The API did not return an M3U8 stream or embed URL.");
         if (active) {
           setSubtitles(tracks);
           const defaultTrack = tracks.find(track => track.default) || tracks.find(track => /english/i.test(track.lang));
@@ -116,12 +117,14 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
     const video = videoRef.current;
     if (!video || !streamUrl) return;
     let hls: Hls | null = null;
+    // Safari can play HLS natively. Other supported browsers use hls.js to read the M3U8 manifest
+    // and request its media segments directly from the stream host (no Kairo HLS proxy).
     if (video.canPlayType("application/vnd.apple.mpegurl")) video.src = streamUrl;
     else if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, capLevelToPlayerSize: true });
       hls.loadSource(streamUrl); hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) setError(data.type === Hls.ErrorTypes.NETWORK_ERROR ? "The stream network request failed. Try another available server." : "This stream could not be decoded. Try another server.");
+        if (data.fatal) setError(data.type === Hls.ErrorTypes.NETWORK_ERROR ? "The direct stream request failed. Check stream availability and CORS, or try another available server." : "This stream could not be decoded. Try another server.");
       });
     } else setError("HLS playback is not supported by this browser.");
     return () => { hls?.destroy(); video.removeAttribute("src"); video.load(); };
@@ -137,7 +140,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
       <div className="watch-main-column">
         <section className="watch-player-shell" aria-label="Anime video player">
           {loading ? <div className="watch-player-state"><RefreshCw className="spin" size={26}/><strong>Connecting to Anikoto…</strong><span>Preparing episode {episodeNumber}</span></div>
-          : streamUrl ? <div className="kairo-video-wrap"><video ref={videoRef} className="kairo-video" controls playsInline preload="metadata" autoPlay aria-label={`${anime.title} episode ${episodeNumber}`}>{subtitles.map(track => <track key={track.url} src={track.url} kind="subtitles" srcLang={track.lang.slice(0,2).toLowerCase()} label={track.lang} default={track.url === selectedSubtitle}/>)}</video><div className="kairo-player-top"><span><i/> KAIRO PLAYER</span><a href={streamUrl} target="_blank" rel="noreferrer"><ExternalLink size={13}/> Stream URL</a></div>{subtitles.length > 0 && <label className="kairo-subtitle-picker"><Captions size={14}/><select aria-label="Subtitle language" value={selectedSubtitle} onChange={event => {setSelectedSubtitle(event.target.value); const video=videoRef.current; if(video) Array.from(video.textTracks).forEach((track,index)=>{track.mode = subtitles[index]?.url === event.target.value ? "showing" : "disabled";});}}><option value="">Subtitles off</option>{subtitles.map(track=><option key={track.url} value={track.url}>{track.lang}{track.default ? " (default)" : ""}</option>)}</select></label>}{error && <div className="kairo-video-warning">{error}</div>}</div>
+          : streamUrl ? <div className="kairo-video-wrap"><video ref={videoRef} className="kairo-video" controls playsInline preload="metadata" autoPlay aria-label={`${anime.title} episode ${episodeNumber}`}>{subtitles.map(track => <track key={track.url} src={track.url} kind="subtitles" srcLang={track.lang.slice(0,2).toLowerCase()} label={track.lang} default={track.url === selectedSubtitle}/>)}</video><div className="kairo-player-top"><span><i/> KAIRO PLAYER</span><a href={streamUrl} target="_blank" rel="noreferrer"><ExternalLink size={13}/> Direct M3U8</a></div>{subtitles.length > 0 && <label className="kairo-subtitle-picker"><Captions size={14}/><select aria-label="Subtitle language" value={selectedSubtitle} onChange={event => {setSelectedSubtitle(event.target.value); const video=videoRef.current; if(video) Array.from(video.textTracks).forEach((track,index)=>{track.mode = subtitles[index]?.url === event.target.value ? "showing" : "disabled";});}}><option value="">Subtitles off</option>{subtitles.map(track=><option key={track.url} value={track.url}>{track.lang}{track.default ? " (default)" : ""}</option>)}</select></label>}{error && <div className="kairo-video-warning">{error}</div>}</div>
           : playerUrl ? <><iframe key={playerUrl} className="watch-iframe" src={playerUrl} title={`${anime.title} — Episode ${episodeNumber}`} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" /><a className="watch-open-link" href={playerUrl} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Open player</a></>
           : <div className="watch-player-state watch-player-state--error"><ShieldAlert size={30}/><strong>Player unavailable</strong><span>{error || "This episode does not currently have a playable URL."}</span><button className="button button--quiet" type="button" onClick={() => onChangeEpisode(episodeNumber)}><RefreshCw size={14}/> Try again</button><small>Kairo uses Anikoto only. It will not silently switch to another provider.</small></div>}
         </section>
