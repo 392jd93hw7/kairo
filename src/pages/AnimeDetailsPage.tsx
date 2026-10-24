@@ -5,7 +5,7 @@ import { getKitsuArtwork } from "../services/api/search.api";
 
 const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "https://anivault-scraper-khaki.vercel.app").replace(/\/$/, "");
 
-type Episode = { number: number; title?: string; id?: string; filler?: boolean; thumbnail?: string };
+type Episode = { number: number; title?: string; id?: string; filler?: boolean; thumbnail?: string };\nconst thumbnailCache = new Map<string, string>();
 type Details = {
   title?: string;
   titleEnglish?: string;
@@ -151,17 +151,30 @@ export default function AnimeDetailsPage({ anime, onBack, onWatch }: {
         const normalized = normalizeEpisodes(payload);
         if (active) setEpisodes(normalized);
 
-        // Fetch episode-specific thumbnails from the Kitsu thumbnail endpoint.
-        const withThumbnails = await Promise.all(normalized.map(async (episode) => {
+        // Load thumbnails concurrently and update each card as soon as its URL is resolved.
+        // Cached URLs are applied immediately on repeat visits.
+        const cacheKey = String(anime.malId);
+        const withCached = normalized.map((episode) => ({
+          ...episode,
+          thumbnail: episode.thumbnail ?? thumbnailCache.get(`${cacheKey}:${episode.number}`),
+        }));
+        if (active) setEpisodes(withCached);
+        await Promise.all(normalized.map(async (episode) => {
+          const key = `${cacheKey}:${episode.number}`;
+          const cached = thumbnailCache.get(key);
+          if (cached) return;
           try {
-            // Prefer the dedicated Kitsu endpoint; use the episode API thumbnail only as fallback.
             const thumbnail = await fetchEpisodeThumbnail(anime.malId!, episode, controller.signal);
-            return thumbnail ? { ...episode, thumbnail } : episode;
+            if (thumbnail) {
+              thumbnailCache.set(key, thumbnail);
+              if (active) setEpisodes((current) => current.map((item) =>
+                item.number === episode.number ? { ...item, thumbnail } : item
+              ));
+            }
           } catch {
-            return episode;
+            // Keep the already-rendered anime artwork while this thumbnail is unavailable.
           }
         }));
-        if (active) setEpisodes(withThumbnails);
       } catch {
         if (active && !controller.signal.aborted) setEpisodes([]);
       } finally {
