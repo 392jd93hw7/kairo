@@ -96,12 +96,11 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
         if (!contentType.includes("json")) throw new Error("The streaming endpoint returned HTML instead of JSON. Check the API base URL and route.");
         const payload = await response.json() as WatchResponse;
         console.info("[Kairo debug] /api/watch response", { request: `${API_BASE}/api/watch?${params.toString()}`, malId: anime.malId, episodeNumber, audioType, selectedServer, m3u8: payload.m3u8, hlsProxyUrl: payload.hlsProxyUrl, embedUrl: payload.embedUrl });
-        // Prefer the API-provided HLS proxy when available. The captured browser HAR showed
-        // the direct m3u8 host returning HTTP 403, while /api/watch also supplies hlsProxyUrl.
-        // Never reconstruct signed stream URLs manually; use the exact URL provided by the API.
+        // Try the original signed M3U8 URL first; if it cannot play, the user can
+        // retry using the API-provided proxy fallback. Never reconstruct signed URLs.
         const directStream = typeof payload.m3u8 === "string" && payload.m3u8.trim() ? payload.m3u8 : undefined;
         const proxyStream = typeof payload.hlsProxyUrl === "string" && payload.hlsProxyUrl.trim() ? payload.hlsProxyUrl : undefined;
-        const stream = proxyStream || directStream;
+        const stream = directStream || proxyStream;
         const embed = str(payload.embedUrl);
         const tracks = Array.isArray(payload.subtitles) ? payload.subtitles.filter((track): track is Subtitle => !!track && typeof track.url === "string" && typeof track.lang === "string") : [];
         if (!stream && !embed) throw new Error(payload.error || payload.note || "The API did not return an M3U8 stream or embed URL.");
