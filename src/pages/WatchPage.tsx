@@ -4,9 +4,20 @@ import type { AnimeSearchResult } from "../services/api/search.api";
 
 const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "https://anivault-scraper-khaki.vercel.app").replace(/\/$/, "");
 type Episode = { number: number; title?: string; id?: string; thumbnail?: string };
+type Server = { id: string; name: string; type?: string; available?: boolean };
 type Props = { anime: AnimeSearchResult; episodeNumber: number; onBack: () => void; onChangeEpisode: (episodeNumber: number) => void };
 const object = (value: unknown): Record<string, unknown> | null => value && typeof value === "object" ? value as Record<string, unknown> : null;
 const str = (...values: unknown[]) => values.find((value): value is string => typeof value === "string" && value.trim().length > 0) as string | undefined;
+function normalizeServers(payload: unknown): Server[] {
+  const root = object(payload);
+  const rows = Array.isArray(payload) ? payload : Array.isArray(root?.servers) ? root.servers : Array.isArray(root?.data) ? root.data : Array.isArray(object(root?.data)?.servers) ? object(root?.data)?.servers as unknown[] : [];
+  return rows.map((row, index) => {
+    if (typeof row === "string") return { id: row, name: row };
+    const item = object(row);
+    const id = str(item?.id, item?.server, item?.serverId, item?.server_id, item?.key, item?.name, item?.provider) || `server-${index + 1}`;
+    return { id, name: str(item?.name, item?.title, item?.label, item?.server, item?.provider) || id, type: str(item?.type, item?.language), available: item?.available !== false && item?.status !== "unavailable" };
+  }).filter(server => server.available);
+}
 function normalizeEpisodes(payload: unknown): Episode[] {
   const root = object(payload);
   const rows = Array.isArray(payload) ? payload : Array.isArray(root?.episodes) ? root.episodes : Array.isArray(root?.data) ? root.data : Array.isArray(object(root?.data)?.episodes) ? object(root?.data)?.episodes as unknown[] : [];
@@ -24,6 +35,10 @@ function findPlayerUrl(payload: unknown, depth = 0): string | undefined {
 export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisode }: Props) {
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [playerUrl, setPlayerUrl] = useState("");
+  const [servers, setServers] = useState<Server[]>([]);
+  const [selectedServer, setSelectedServer] = useState("");
+  const [audioType, setAudioType] = useState<"sub" | "dub">("sub");
+  const [serversLoading, setServersLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [episodeLoading, setEpisodeLoading] = useState(true);
   const [error, setError] = useState("");
@@ -42,34 +57,61 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
     return () => controller.abort();
   }, [anime.malId]);
   useEffect(() => {
+    if (!anime.malId) { setServers([]); setServersLoading(false); return; }
+    const controller = new AbortController();
+    setServersLoading(true);
+    fetch(`${API_BASE}/api/servers?malId=${encodeURIComponent(String(anime.malId))}&ep=${encodeURIComponent(String(episodeNumber))}`, {
+      signal: controller.signal, headers: { Accept: "application/json" },
+    }).then(async response => {
+      const contentType = response.headers.get("content-type") || "";
+      if (!response.ok) throw new Error(`Server lookup failed (${response.status}).`);
+      if (!contentType.includes("json")) throw new Error("Server endpoint returned HTML instead of JSON.");
+      return response.json();
+    }).then(payload => {
+      const available = normalizeServers(payload);
+      setServers(available);
+      setSelectedServer(current => available.some(server => server.id === current) ? current : (available[0]?.id || ""));
+    }).catch(() => { if (!controller.signal.aborted) { setServers([]); setSelectedServer(""); } })
+      .finally(() => { if (!controller.signal.aborted) setServersLoading(false); });
+    return () => controller.abort();
+  }, [anime.malId, episodeNumber]);
+
+  useEffect(() => {
     const controller = new AbortController(); let active = true;
     setLoading(true); setError(""); setPlayerUrl("");
     async function loadPlayer() {
       try {
         if (!anime.malId) throw new Error("This anime has no MyAnimeList ID, so the player cannot resolve its episode.");
-        // AniVault exposes the stream resolver as /watch/:source/:id/:ep/:type.
-        // Use the MAL-prefixed ID because the resolver explicitly supports it.
-        const endpoint = `${API_BASE}/api/watch/anikoto/mal-${anime.malId}/${episodeNumber}/sub`;
-        const response = await fetch(endpoint, { signal: controller.signal, headers: { Accept: "application/json" } });
+        const params = new URLSearchParams({
+          malId: String(anime.malId),
+          ep: String(episodeNumber),
+          type: audioType,
+          source: "anikoto",
+        });
+        if (selectedServer) params.set("server", selectedServer);
+        const response = await fetch(`${API_BASE}/api/watch?${params.toString()}`, {
+          signal: controller.signal, headers: { Accept: "application/json" },
+        });
         const contentType = response.headers.get("content-type") || "";
         if (!response.ok) {
           const detail = contentType.includes("json") ? await response.json().catch(() => null) : await response.text().catch(() => "");
           const message = object(detail);
-          throw new Error(str(message?.error, message?.detail) || `Anikoto player request failed (${response.status}).`);
+          throw new Error(str(message?.error, message?.message, message?.detail) || `Anikoto player request failed (${response.status}).`);
         }
-        if (!contentType.includes("json")) throw new Error("The streaming API returned HTML instead of JSON. Check the API base URL and route.");
+        if (!contentType.includes("json")) throw new Error("The streaming endpoint returned HTML instead of JSON. Check the API base URL and route.");
         const payload: unknown = await response.json();
         const result = object(payload);
-        // Prefer the provider's embed URL. hlsProxyUrl is a direct stream and
-        // must not be treated as an iframe URL unless no embed was supplied.
-        const url = str(result?.embedUrl, result?.playerUrl, result?.iframeUrl, result?.url) || findPlayerUrl(payload);
-        if (!url) throw new Error(str(result?.error, result?.note) || "AniVault did not return a playable Anikoto embed URL for this episode.");
+        const url = str(result?.embedUrl, result?.embed_url, result?.iframeUrl, result?.iframe, result?.playerUrl, result?.player_url, result?.url, result?.src, result?.streamUrl, result?.stream_url) || findPlayerUrl(payload);
+        if (!url) throw new Error(str(result?.error, result?.message, result?.note) || "No player URL was returned for this server and episode.");
         if (active) setPlayerUrl(url);
-      } catch (caught) { if (active && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : "Could not load the player."); }
-      finally { if (active) setLoading(false); }
+      } catch (caught) {
+        if (active && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : "Could not load the player.");
+      } finally { if (active) setLoading(false); }
     }
-    void loadPlayer(); return () => { active = false; controller.abort(); };
-  }, [anime.malId, episodeNumber]);
+    void loadPlayer();
+    return () => { active = false; controller.abort(); };
+  }, [anime.malId, episodeNumber, audioType, selectedServer]);
+
   const previous = episodes.filter(item => item.number < episodeNumber).at(-1);
   const next = episodes.find(item => item.number > episodeNumber);
   const title = currentEpisode?.title || `Episode ${episodeNumber}`;
@@ -93,8 +135,9 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
         </div>
         <div className="watch-server-panel">
           <div className="watch-now-playing"><span>You are Watching</span><strong>Episode {episodeNumber}</strong><small>If the current server doesn't work, try another available source.</small></div>
-          <div className="watch-language-row"><Captions size={16}/><b>SUB:</b><span className="watch-server-selected">Anikoto</span></div>
-          <div className="watch-language-row"><Mic size={16}/><b>DUB:</b><span className="watch-server-disabled">If available</span></div>
+          <div className="watch-language-row"><Captions size={16}/><b>SUB:</b><button type="button" className={audioType === "sub" ? "watch-server-selected" : "watch-server-disabled"} onClick={() => setAudioType("sub")}>SUB</button></div>
+          <div className="watch-language-row"><Mic size={16}/><b>DUB:</b><button type="button" className={audioType === "dub" ? "watch-server-selected" : "watch-server-disabled"} onClick={() => setAudioType("dub")}>DUB</button></div>
+          <div className="watch-language-row watch-server-list-row"><b>SERVER:</b>{serversLoading ? <span>Checking availability…</span> : servers.length ? <div className="watch-server-options">{servers.map(server => <button key={server.id} type="button" className={selectedServer === server.id ? "watch-server-selected" : "watch-server-disabled"} onClick={() => setSelectedServer(server.id)}>{server.name}</button>)}</div> : <span>No servers reported available.</span>}</div>
         </div>
         <section className="watch-about">
           <h2>About Anime</h2><div className="watch-about-card">
