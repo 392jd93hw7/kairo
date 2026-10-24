@@ -85,7 +85,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
         </div>
         <section className="watch-about">
           <h2>About Anime</h2><div className="watch-about-card">
-            <div className="watch-about-poster">{anime.imageUrl ? <img src={anime.imageUrl} alt={anime.title} loading="lazy"/> : <Play size={25}/>}</div>
+            <div className="watch-about-poster">{anime.image ? <img src={anime.image} alt={anime.title} loading="lazy"/> : <Play size={25}/>}</div>
             <div className="watch-about-copy"><h3>{anime.title}</h3><p>{anime.synopsis || "Explore the series details and continue watching episodes on Kairo."}</p><div><span>{episodes.length || "—"} EPISODES</span><span>MYANIMELIST METADATA</span></div></div>
           </div>
         </section>
