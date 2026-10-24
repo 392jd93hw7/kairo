@@ -207,3 +207,17 @@ button{color:inherit}a{color:inherit}img{display:block;max-width:100%}
 .watch-server-options .watch-server-selected,.watch-language-row>button.watch-server-selected{background:var(--accent,#b5f500);border-color:var(--accent,#b5f500);color:#111;font-weight:700}
 .watch-server-options .watch-server-disabled,.watch-language-row>button.watch-server-disabled{background:#141510;color:#b9bba9}
 .watch-server-list-row>span{color:#9b9b91;font-size:12px}
+
+
+/* Kairo custom HLS video player */
+.kairo-video-wrap{position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.kairo-video{display:block;width:100%;height:100%;max-height:100%;background:#000;object-fit:contain;outline:0}
+.kairo-player-top{position:absolute;left:14px;right:14px;top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;opacity:0;transition:opacity .2s;pointer-events:none;text-shadow:0 1px 5px #000}
+.kairo-video-wrap:hover .kairo-player-top,.kairo-video-wrap:focus-within .kairo-player-top{opacity:1}
+.kairo-player-top>span{display:flex;align-items:center;gap:7px;font:700 10px 'DM Mono',monospace;letter-spacing:1px;color:#f4f4f4}
+.kairo-player-top>span i{width:6px;height:6px;border-radius:50%;background:#a6df00;box-shadow:0 0 10px #a6df00}
+.kairo-player-top a{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 9px;border-radius:5px;background:rgba(0,0,0,.65);color:#d9f59a;font-size:11px;text-decoration:none}
+.kairo-subtitle-picker{position:absolute;right:14px;bottom:52px;display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid #414141;border-radius:5px;background:rgba(0,0,0,.82);color:#fff;opacity:0;transition:opacity .2s}
+.kairo-video-wrap:hover .kairo-subtitle-picker,.kairo-video-wrap:focus-within .kairo-subtitle-picker{opacity:1}
+.kairo-subtitle-picker select{max-width:170px;border:0;outline:0;background:#111;color:#fff;font-size:11px}
+.kairo-video-warning{position:absolute;left:12px;right:12px;bottom:12px;padding:9px 12px;background:rgba(80,20,20,.92);color:#ffd7d7;border-radius:5px;font-size:12px}
