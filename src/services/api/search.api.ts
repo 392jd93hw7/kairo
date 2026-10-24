@@ -61,7 +61,7 @@ function normalizeAnime(value: unknown, index: number): AnimeSearchResult | null
 }
 
 export async function searchAnime(query: string, signal?: AbortSignal): Promise<AnimeSearchResult[]> {
-  const response = await fetch(`${API_BASE}/api/mal/anime?q=${encodeURIComponent(query)}&limit=8`, {
+  const response = await fetch(`${API_BASE}/api/mal/search?q=${encodeURIComponent(query)}&limit=8`, {
     signal,
     headers: { Accept: "application/json" },
   });
