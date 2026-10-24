@@ -5,7 +5,7 @@ import { getKitsuArtwork } from "../services/api/search.api";
 
 const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "https://anivault-scraper-khaki.vercel.app").replace(/\/$/, "");
 
-type Episode = { number: number; title?: string; id?: string; filler?: boolean };
+type Episode = { number: number; title?: string; id?: string; filler?: boolean; thumbnail?: string };
 type Details = {
   title?: string;
   titleEnglish?: string;
@@ -46,6 +46,7 @@ function normalizeEpisodes(payload: unknown): Episode[] {
       title: text(item?.title) ?? text(item?.name),
       id: text(item?.id) ?? text(item?.episodeId),
       filler: item?.filler === true,
+      thumbnail: text(item?.thumbnail) ?? text(item?.thumbnailUrl) ?? text(item?.thumbnail_url) ?? text(item?.image) ?? text(item?.imageUrl) ?? text(item?.image_url) ?? text(item?.poster) ?? text(asObject(item?.images)?.jpg && asObject(asObject(item?.images)?.jpg)?.image_url),
     };
   }).filter((episode) => episode.number > 0);
 }
@@ -175,9 +176,15 @@ export default function AnimeDetailsPage({ anime, onBack, onWatch }: {
           <div className="episode-grid">
             {episodes.map((episode) => (
               <button className="episode-card" key={episode.id ?? episode.number} type="button" onClick={() => onWatch(anime, episode)}>
-                <span className="episode-card__number">{String(episode.number).padStart(2, "0")}</span>
+                <span className="episode-card__thumbnail">
+                  {(episode.thumbnail || artwork) ? (
+                    <img src={episode.thumbnail || artwork} alt="" loading="lazy" />
+                  ) : (
+                    <span className="episode-card__thumbnail-placeholder">{String(episode.number).padStart(2, "0")}</span>
+                  )}
+                  <span className="episode-card__thumbnail-play"><Play size={14} fill="currentColor" /></span>
+                </span>
                 <span className="episode-card__copy"><strong>{episode.title ?? `Episode ${episode.number}`}</strong><small>{episode.filler ? "Filler episode" : "Available via Anikoto"}</small></span>
-                <span className="episode-card__play"><Play size={14} fill="currentColor" /></span>
               </button>
             ))}
           </div>
