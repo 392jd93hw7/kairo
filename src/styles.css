@@ -197,3 +197,13 @@ button{color:inherit}a{color:inherit}img{display:block;max-width:100%}
 .search-popover__footer kbd{padding:2px 5px;border:1px solid #343434;border-radius:4px;background:#171717;color:#c4c4c4;font:10px 'DM Mono',monospace}
 @keyframes kairo-search-spin{to{transform:rotate(360deg)}}
 @media(max-width:640px){.navbar-search{width:min(100%,calc(100vw - 32px))}.search-popover{position:fixed;top:72px;left:12px;right:12px;width:auto;max-height:calc(100vh - 100px)}.search-result{gap:10px}.search-result__poster{flex-basis:43px;width:43px;height:59px}}
+
+
+/* Watch page server and audio selection */
+.watch-server-list-row{align-items:flex-start!important;flex-wrap:wrap;gap:10px}
+.watch-server-options{display:flex;flex-wrap:wrap;gap:8px;min-width:0;flex:1}
+.watch-server-options button,.watch-language-row>button{border:1px solid #30322a;border-radius:6px;padding:8px 12px;background:#141510;color:#b9bba9;font:inherit;font-size:12px;cursor:pointer;transition:background .16s,border-color .16s,color .16s}
+.watch-server-options button:hover,.watch-language-row>button:hover{border-color:var(--accent,#b5f500);color:#fff}
+.watch-server-options .watch-server-selected,.watch-language-row>button.watch-server-selected{background:var(--accent,#b5f500);border-color:var(--accent,#b5f500);color:#111;font-weight:700}
+.watch-server-options .watch-server-disabled,.watch-language-row>button.watch-server-disabled{background:#141510;color:#b9bba9}
+.watch-server-list-row>span{color:#9b9b91;font-size:12px}
