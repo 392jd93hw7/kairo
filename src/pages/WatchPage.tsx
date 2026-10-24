@@ -103,7 +103,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
         const stream = directStream || proxyStream;
         const embed = str(payload.embedUrl);
         const providerRef = (() => { try { return payload.embedUrl ? `${new URL(payload.embedUrl).origin}/` : window.location.origin; } catch { return window.location.origin; } })();
-        const tracks = Array.isArray(payload.subtitles) ? payload.subtitles.filter((track): track is Subtitle => !!track && typeof track.url === "string" && typeof track.lang === "string").map(track => ({ ...track, url: `${API_BASE}/api/proxy/subtitle?url=${encodeURIComponent(track.url)}&ref=${encodeURIComponent(providerRef)}` })) : [];
+        const tracks = Array.isArray(payload.subtitles) ? payload.subtitles.filter((track): track is Subtitle => !!track && typeof track.url === "string" && typeof track.lang === "string").map(track => ({ ...track, url: track.url.startsWith(`${API_BASE}/api/proxy/subtitle`) ? track.url : `${API_BASE}/api/proxy/subtitle?url=${encodeURIComponent(track.url)}&ref=${encodeURIComponent(providerRef)}` })) : [];
         if (!stream && !embed) throw new Error(payload.error || payload.note || "The API did not return an M3U8 stream or embed URL.");
         if (active) {
           setSubtitles(tracks);
