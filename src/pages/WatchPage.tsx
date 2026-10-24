@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
+import Plyr from "plyr";
+import "plyr/dist/plyr.css";
 import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Play, RefreshCw, ShieldAlert, Search, Captions, Mic, Grid2X2, Eye, Flag, Settings, Volume2, Maximize } from "lucide-react";
 import type { AnimeSearchResult } from "../services/api/search.api";
 
@@ -123,18 +125,38 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
     const video = videoRef.current;
     if (!video || !streamUrl) return;
     let hls: Hls | null = null;
-    // Safari can play HLS natively. Other supported browsers use hls.js to read the M3U8 manifest
-    // and request its media segments directly from the stream host (no Kairo HLS proxy).
-    if (video.canPlayType("application/vnd.apple.mpegurl")) video.src = streamUrl;
-    else if (Hls.isSupported()) {
+    // Plyr supplies Kairo's custom controls; HLS.js handles the HLS manifest in browsers
+    // that do not support native HLS playback.
+    const player = new Plyr(video, {
+      controls: ["play-large", "play", "rewind", "fast-forward", "progress", "current-time", "duration", "mute", "volume", "settings", "pip", "fullscreen"],
+      settings: ["speed"],
+      speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
+      seekTime: 10,
+      tooltips: { controls: true, seek: true },
+      keyboard: { focused: true, global: true },
+      hideControls: true,
+      clickToPlay: true,
+      invertTime: false,
+    });
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = streamUrl;
+    } else if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, capLevelToPlayerSize: true });
       console.info("[Kairo debug] HLS player loading", { streamUrl, videoCurrentSrc: video.currentSrc, videoSrc: video.src });
-      hls.loadSource(streamUrl); hls.attachMedia(video);
+      hls.loadSource(streamUrl);
+      hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) setError(data.type === Hls.ErrorTypes.NETWORK_ERROR ? "The direct stream request failed. Check stream availability and CORS, or try another available server." : "This stream could not be decoded. Try another server.");
+        if (data.fatal) setError(data.type === Hls.ErrorTypes.NETWORK_ERROR ? "The stream request failed. Check stream availability and CORS, or try another available server." : "This stream could not be decoded. Try another server.");
       });
-    } else setError("HLS playback is not supported by this browser.");
-    return () => { hls?.destroy(); video.removeAttribute("src"); video.load(); };
+    } else {
+      setError("HLS playback is not supported by this browser.");
+    }
+    return () => {
+      hls?.destroy();
+      player.destroy();
+      video.removeAttribute("src");
+      video.load();
+    };
   }, [streamUrl]);
 
 
