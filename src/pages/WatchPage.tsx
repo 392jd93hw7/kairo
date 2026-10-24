@@ -40,6 +40,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
   const [loading, setLoading] = useState(true);
   const [episodeLoading, setEpisodeLoading] = useState(true);
   const [error, setError] = useState("");
+  const [playbackAttempt, setPlaybackAttempt] = useState(0);
   const [episodeQuery, setEpisodeQuery] = useState("");
   const [theater, setTheater] = useState(false);
   const currentEpisode = useMemo(() => episodes.find((episode) => episode.number === episodeNumber), [episodes, episodeNumber]);
@@ -83,7 +84,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
         if (!anime.malId) throw new Error("This anime has no MyAnimeList ID, so the player cannot resolve its episode.");
         const params = new URLSearchParams({ malId: String(anime.malId), ep: String(episodeNumber), type: audioType, source: "anikoto" });
         if (selectedServer) params.set("server", selectedServer);
-        const response = await fetch(`${API_BASE}/api/watch?${params.toString()}`, { signal: controller.signal, headers: { Accept: "application/json" } });
+        const response = await fetch(`${API_BASE}/api/watch?${params.toString()}`, { signal: controller.signal, cache: "no-store", headers: { Accept: "application/json", "Cache-Control": "no-cache" } });
         const contentType = response.headers.get("content-type") || "";
         if (!response.ok) {
           const detail = contentType.includes("json") ? await response.json().catch(() => null) : await response.text().catch(() => "");
@@ -92,7 +93,8 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
         }
         if (!contentType.includes("json")) throw new Error("The streaming endpoint returned HTML instead of JSON. Check the API base URL and route.");
         const payload = await response.json() as WatchResponse;
-        // Prefer the original M3U8 manifest. Do not use hlsProxyUrl or route stream traffic through a proxy.
+        // Use the complete M3U8 URL exactly as returned by /api/watch, including its signed token query parameter.
+        // Do not rebuild the URL from its path or substitute hlsProxyUrl.
         const stream = str(payload.m3u8);
         const embed = str(payload.embedUrl);
         const tracks = Array.isArray(payload.subtitles) ? payload.subtitles.filter((track): track is Subtitle => !!track && typeof track.url === "string" && typeof track.lang === "string") : [];
@@ -111,7 +113,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
     }
     void loadPlayer();
     return () => { active = false; controller.abort(); };
-  }, [anime.malId, episodeNumber, audioType, selectedServer, serversLoading]);
+  }, [anime.malId, episodeNumber, audioType, selectedServer, serversLoading, playbackAttempt]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -142,14 +144,14 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
           {loading ? <div className="watch-player-state"><RefreshCw className="spin" size={26}/><strong>Connecting to Anikoto…</strong><span>Preparing episode {episodeNumber}</span></div>
           : streamUrl ? <div className="kairo-video-wrap"><video ref={videoRef} className="kairo-video" controls playsInline preload="metadata" autoPlay aria-label={`${anime.title} episode ${episodeNumber}`}>{subtitles.map(track => <track key={track.url} src={track.url} kind="subtitles" srcLang={track.lang.slice(0,2).toLowerCase()} label={track.lang} default={track.url === selectedSubtitle}/>)}</video><div className="kairo-player-top"><span><i/> KAIRO PLAYER</span><a href={streamUrl} target="_blank" rel="noreferrer"><ExternalLink size={13}/> Direct M3U8</a></div>{subtitles.length > 0 && <label className="kairo-subtitle-picker"><Captions size={14}/><select aria-label="Subtitle language" value={selectedSubtitle} onChange={event => {setSelectedSubtitle(event.target.value); const video=videoRef.current; if(video) Array.from(video.textTracks).forEach((track,index)=>{track.mode = subtitles[index]?.url === event.target.value ? "showing" : "disabled";});}}><option value="">Subtitles off</option>{subtitles.map(track=><option key={track.url} value={track.url}>{track.lang}{track.default ? " (default)" : ""}</option>)}</select></label>}{error && <div className="kairo-video-warning">{error}</div>}</div>
           : playerUrl ? <><iframe key={playerUrl} className="watch-iframe" src={playerUrl} title={`${anime.title} — Episode ${episodeNumber}`} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" /><a className="watch-open-link" href={playerUrl} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Open player</a></>
-          : <div className="watch-player-state watch-player-state--error"><ShieldAlert size={30}/><strong>Player unavailable</strong><span>{error || "This episode does not currently have a playable URL."}</span><button className="button button--quiet" type="button" onClick={() => onChangeEpisode(episodeNumber)}><RefreshCw size={14}/> Try again</button><small>Kairo uses Anikoto only. It will not silently switch to another provider.</small></div>}
+          : <div className="watch-player-state watch-player-state--error"><ShieldAlert size={30}/><strong>Player unavailable</strong><span>{error || "This episode does not currently have a playable URL."}</span><button className="button button--quiet" type="button" onClick={() => setPlaybackAttempt(value => value + 1)}><RefreshCw size={14}/> Try again</button><small>Kairo uses Anikoto only. It will not silently switch to another provider.</small></div>}
         </section>
         <div className="watch-report-notice"><Flag size={15}/> If this episode is not working, report it so we can investigate.</div>
         <div className="watch-feature-bar">
           <span className="watch-live"><i/> ANIKOTO</span>
           <button type="button" onClick={() => setTheater(value => !value)}><Grid2X2 size={15}/> THEATER</button>
           <button type="button" title="Keyboard shortcuts"><Settings size={15}/> KEYS</button>
-          <button type="button" onClick={() => onChangeEpisode(episodeNumber)}><RefreshCw size={15}/> RELOAD</button>
+          <button type="button" onClick={() => setPlaybackAttempt(value => value + 1)}><RefreshCw size={15}/> RELOAD</button>
           <button type="button" onClick={() => next && onChangeEpisode(next.number)} disabled={!next}><Play size={15}/> AUTO NEXT</button>
           <button type="button" onClick={() => setTheater(true)}><Maximize size={15}/> FULLSCREEN</button>
         </div>
