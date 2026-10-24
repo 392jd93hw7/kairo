@@ -109,7 +109,7 @@ export default function WatchPage({ anime, episodeNumber, onBack, onChangeEpisod
         }
       } catch (caught) {
         if (active && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : "Could not load the player.");
-      } finally { if (active) setLoading(false); }
+      } finally { if (active && !controller.signal.aborted) setLoading(false); }
     }
     void loadPlayer();
     return () => { active = false; controller.abort(); };
