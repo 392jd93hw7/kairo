@@ -164,3 +164,36 @@ button{color:inherit}a{color:inherit}img{display:block;max-width:100%}
 .app-shell .feature-card__line{position:absolute!important;bottom:0!important;left:22px!important;width:35px!important;height:2px!important;background:#a6df00!important}
 .app-shell .search-tip{position:relative!important;z-index:1!important;display:flex!important;align-items:center!important;gap:15px!important;margin:0 clamp(22px,7vw,100px) 70px!important;padding:18px 21px!important;border:1px solid #2b3021!important;border-radius:10px!important;background:#10120c!important}
 @media(max-width:650px){.app-shell .hero{min-height:520px!important;padding:65px 23px 95px!important}.app-shell .hero h1{font-size:clamp(42px,12vw,64px)!important}.app-shell .hero__orbit--outer{width:90vw!important;right:-42%!important;top:14%!important}.app-shell .hero__orbit--inner{width:68vw!important;right:-18%!important;top:26%!important}.app-shell .hero__symbol{right:-5%!important;top:28%!important;font-size:210px!important}.app-shell .hero__side-note{display:none!important}.app-shell .intro-section{padding:52px 20px!important}.app-shell .section-heading{align-items:flex-start!important;flex-direction:column!important;gap:12px!important}.app-shell .feature-grid{grid-template-columns:1fr!important}.app-shell .feature-card{min-height:145px!important}.app-shell .search-tip{margin:0 20px 48px!important;padding:14px!important}}
+
+
+/* Kairo navbar search — polished, compact dropdown */
+.navbar-search{position:relative;width:min(360px,34vw);z-index:1000;font-family:'DM Sans',sans-serif}
+.search-field{height:44px;display:flex;align-items:center;gap:10px;padding:0 12px;border:1px solid #292929;border-radius:9px;background:#101010;transition:border-color .18s,box-shadow .18s,background .18s}
+.search-field:focus-within,.search-field--active{border-color:rgba(166,223,0,.65);background:#11130c;box-shadow:0 0 0 3px rgba(166,223,0,.08)}
+.search-field__icon{flex-shrink:0;color:#929292}
+.search-field input{width:100%;min-width:0;border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;color:#f4f4f4!important;font:500 13px 'DM Sans',sans-serif!important;padding:0!important}
+.search-field input::placeholder{color:#777}
+.search-shortcut{flex-shrink:0;padding:3px 6px;border:1px solid #333;border-radius:5px;color:#858585;font:10px 'DM Mono',monospace}
+.search-field__spinner{flex-shrink:0;color:#a6df00;animation:kairo-search-spin 1s linear infinite}
+.search-field__clear{display:grid;place-items:center;flex-shrink:0;width:25px;height:25px;border:0;border-radius:5px;background:#242424;color:#b8b8b8;cursor:pointer}
+.search-field__clear:hover{background:#343434;color:#fff}
+.search-popover{position:absolute;top:calc(100% + 10px);right:0;width:min(540px,calc(100vw - 28px));max-height:min(72vh,640px);overflow:auto;padding:10px;background:#0d0d0d;border:1px solid #292929;border-radius:13px;box-shadow:0 22px 70px rgba(0,0,0,.7);color:#f5f5f5;z-index:1001;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#414141 transparent}
+.search-popover__heading{position:sticky;top:-10px;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:12px;margin:-10px -10px 7px;padding:14px 14px 11px;background:rgba(13,13,13,.97);border-bottom:1px solid #242424;color:#e9e9e9;font-size:12px;font-weight:700}
+.search-popover__hint{padding:4px 6px;border:1px solid #303a16;border-radius:4px;color:#a6df00;font:9px 'DM Mono',monospace;letter-spacing:.12em}
+.search-result{width:100%;display:flex;align-items:center;gap:12px;padding:9px;text-align:left;border:1px solid transparent;border-radius:9px;background:transparent;color:inherit;cursor:pointer;transition:background .15s,border-color .15s}
+.search-result:hover,.search-result--active{background:#171b0d;border-color:#354717}
+.search-result__poster{display:block;position:relative;flex:0 0 48px;width:48px;height:66px;overflow:hidden;border-radius:5px;background:linear-gradient(135deg,#1c1c1c,#101010);border:1px solid #292929}
+.search-result__poster img{display:block;width:100%;height:100%;object-fit:cover}
+.poster-placeholder{display:grid;place-items:center;width:100%;height:100%;color:#a6df00;font-size:20px;font-weight:800}
+.search-result__copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px}
+.search-result__copy strong{display:-webkit-box;overflow:hidden;color:#f2f2f2;font-size:13px;font-weight:650;line-height:1.4;text-overflow:ellipsis;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.search-result__copy>span{color:#8f8f8f;font-size:10px;letter-spacing:.02em}
+.search-result__arrow{flex-shrink:0;color:#656565;transition:color .15s,transform .15s}
+.search-result:hover .search-result__arrow,.search-result--active .search-result__arrow{color:#a6df00;transform:translate(2px,-2px)}
+.search-state{display:flex;align-items:center;justify-content:center;gap:10px;min-height:100px;padding:20px;color:#999;font-size:12px;text-align:center}
+.search-state--error{color:#ff9292}
+.search-popover .spin{color:#a6df00;animation:kairo-search-spin 1s linear infinite}
+.search-popover__footer{display:flex;justify-content:space-between;gap:12px;margin-top:7px;padding:10px 7px 3px;border-top:1px solid #242424;color:#777;font-size:10px}
+.search-popover__footer kbd{padding:2px 5px;border:1px solid #343434;border-radius:4px;background:#171717;color:#c4c4c4;font:10px 'DM Mono',monospace}
+@keyframes kairo-search-spin{to{transform:rotate(360deg)}}
+@media(max-width:640px){.navbar-search{width:min(100%,calc(100vw - 32px))}.search-popover{position:fixed;top:72px;left:12px;right:12px;width:auto;max-height:calc(100vh - 100px)}.search-result{gap:10px}.search-result__poster{flex-basis:43px;width:43px;height:59px}}
