@@ -54,10 +54,9 @@ function normalizeEpisodes(payload: unknown): Episode[] {
 
 async function fetchEpisodeThumbnail(malId: number, episode: Episode, signal: AbortSignal): Promise<string | undefined> {
   const params = new URLSearchParams({
+    ep: episode.id ?? String(episode.number),
     malId: String(malId),
-    episode: String(episode.number),
   });
-  if (episode.id) params.set("episodeId", episode.id);
   const response = await fetch(`${API_BASE}/api/kitsu/episode-thumb?${params.toString()}`, {
     signal,
     headers: { Accept: "application/json" },
