@@ -13,7 +13,8 @@
     "react": "latest",
     "react-dom": "latest",
     "lucide-react": "^0.468.0",
-    "hls.js": "^1.6.13"
+    "hls.js": "^1.6.13",
+    "plyr": "^3.7.8"
   },
   "devDependencies": {
     "@types/react": "latest",
