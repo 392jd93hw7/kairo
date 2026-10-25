@@ -3,7 +3,7 @@ import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, Play, Plus, Star } from 
 import type { AnimeSearchResult } from "../services/api/search.api";
 import { getKitsuArtwork } from "../services/api/search.api";
 
-const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "http://3.26.204.226:3000").replace(/\/$/, "");
+const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "").replace(/\/$/, "");
 
 type Episode = { number: number; title?: string; id?: string; filler?: boolean; thumbnail?: string };
 const thumbnailCache = new Map<string, string>();
