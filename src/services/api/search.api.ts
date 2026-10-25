@@ -1,4 +1,4 @@
-const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "https://anivault-scraper-khaki.vercel.app").replace(/\/$/, "");
+const API_BASE = (import.meta.env.VITE_ANIVAULT_API_BASE || "http://3.26.204.226:3000").replace(/\/$/, "");
 
 export type AnimeSearchResult = {
   id: string;
